@@ -1,11 +1,10 @@
 //REQUIRED
 const User = require('../models/user');
-const TokenForgot = require('../models/token-forgot');
+const Pin = require('../models/pin');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { generatorJWT } = require('../helpers/jwt');
 const { googleVerify } = require('../helpers/google-verify');
-const { sendEmail } = require('../helpers/send-email');
 
 
 //CODE
@@ -13,28 +12,45 @@ const login = async (req, res) => {
 
     try {
         const { email, password } = req.body;
-        const userDB = await User.findOne({ email, status: true });
+        const userDB = await User.findOne({ email });
 
-        //VERIFY PASSWORD
-        const validPassword = bcrypt.compareSync(password, userDB.password);
-
-        if (!validPassword || !userDB) {
-            return res.status(400).json({
+        const errorMessage = () => {
+            res.status(401).json({
                 ok: false,
                 message: 'Invalid Email or Password'
             });
         }
+
+        if (!userDB) return errorMessage()
+
+        //VERIFY PASSWORD
+        const validPassword = bcrypt.compareSync(password, userDB.password);
+        if (!validPassword) return errorMessage()
+
         const expire = '12h'
         //GENERATE TOKEN
         const token = await generatorJWT(userDB.id, expire);
 
+        const pins = await Pin.find({ user: userDB._id }).populate('user', 'name -_id');
+        const favs = await Pin.find({ likes: userDB._id.toString() }).populate('user', 'name -_id');
+
+        favs.forEach(pin => pin.likes = pin.likes.length)
+        pins.forEach(pin => pin.likes = pin.likes.length)
+
         res.json({
             ok: true,
             token,
-            user: userDB.name
+            user: {
+                name: userDB.name,
+                email: userDB.email,
+                pins,
+                favs
+            },
+
         });
 
     } catch (error) {
+        console.log(error)
         res.status(500).json({
             ok: false,
             message: "Error Unexpected, check logs"
@@ -47,29 +63,22 @@ const googleSignIn = async (req, res) => {
     const tokenGoogle = req.body.token;
 
     try {
-        const { given_name, family_name, email } = await googleVerify(tokenGoogle);
+        const { given_name, family_name, email, picture } = await googleVerify(tokenGoogle);
         let user = await User.findOne({ email });
 
         if (!user) {
-
             // CREATE USER
             const data = {
-                name: given_name,
-                lastname: family_name,
-                email,
+                name: given_name.toLowerCase(),
+                image: picture,
+                lastname: family_name.toLowerCase(),
+                email: email.toLowerCase(),
                 password: 'none',
                 google: true
             };
 
             user = new User(data);
             await user.save();
-        }
-
-        // IF THE USER HAS STATE: FALSE
-        if (!user.status) {
-            return res.status(401).json({
-                message: 'blocked user, talk to the administrator'
-            });
         }
 
         const expire = '12h'
@@ -79,7 +88,7 @@ const googleSignIn = async (req, res) => {
         res.json({
             message: 'User logged',
             token,
-            user: user.name
+            user: { name: user.name, image: picture }
 
         });
 
@@ -98,8 +107,8 @@ const changePassword = async (req, res) => {
 
     try {
         const id = req.id
-        const oldPassword = req.body.oldPassword;
-        const newPassword = req.body.newPassword;
+        const oldPassword = req.body.oldpassword;
+        const newPassword = req.body.newpassword;
         const userDB = await User.findById(id);
 
         //VERIFY PASSWORD
@@ -132,101 +141,8 @@ const changePassword = async (req, res) => {
     }
 }
 
-//PETITION RESET PASSWORD
-const forgetEmail = async (req, res) => {
-
-    try {
-        const email = req.body.email;
-
-        //VALIDATION OF USER
-        const user = await User.findOne({ email });
-        if (!user) {
-            return res.status(404).json({
-                ok: false,
-                message: 'User not found'
-            });
-        }
-
-        const { name, id, google } = user;
-
-        //VALIDATION OF USER WITH GOOGLE
-        if (google) {
-            return res.status(404).json({
-                ok: false,
-                message: 'This user is register with google not by email and password.'
-            });
-        }
-
-        //CODE
-        const expire = '60m';
-        const token = await generatorJWT(id, expire);
-        const verificationLink = `http://localhost:3000/auth/password-reset/${token}`
-        const subject = `Password Reset Request For ${name}`;
-        const text = `Hi ${name}, here is your link to change the password ${verificationLink}`;
-        const tokenForgot = new TokenForgot({ user: id, token });
-
-        //VALIDATION OF TOKENDB
-        const tokenDB = await TokenForgot.findOne({ user: id });
-        if (tokenDB) {
-            await tokenDB.delete();
-        }
-
-        //SAVE TOKEN AND SEND EMAIL
-        await tokenForgot.save();
-
-        //SEND EMAIL
-        // await sendEmail(email, subject, text);
-
-        res.json({
-            ok: true,
-            message: "Email send successfully"
-        });
-
-    } catch (error) {
-        res.status(400).json({
-            ok: false,
-            message: "Error Unexpected, check logs"
-        });
-    }
-}
-
-
-//RESET PASSWORD
-const resetPassword = async (req, res) => {
-
-    try {
-        const token = req.params.token;
-        const newPassword = req.body.password;
-
-        //GET PARAMS FROM THE TOKEN
-        const { id } = jwt.verify(token, process.env.JWT_SECRET);
-
-        //CODE
-        const salt = bcrypt.genSaltSync();
-        const password = bcrypt.hashSync(newPassword, salt);
-
-        //UPDATE PASSWORD
-        await User.findByIdAndUpdate(id, { password });
-
-        //DELETE TOKEN
-        await TokenForgot.findOneAndRemove({ token });
-
-        res.json({
-            ok: true,
-            message: "Password changed correctly",
-        });
-
-    } catch (error) {
-        res.status(400).json({
-            ok: false,
-            message: "Error Unexpected, check logs"
-        });
-    }
-}
 module.exports = {
     login,
     googleSignIn,
-    changePassword,
-    forgetEmail,
-    resetPassword
+    changePassword
 }

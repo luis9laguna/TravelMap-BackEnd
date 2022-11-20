@@ -1,7 +1,7 @@
 const User = require('../models/user')
+const Pin = require('../models/pin')
 const bcrypt = require('bcryptjs');
 const { generatorJWT } = require('../helpers/jwt');
-const cloudinary = require('cloudinary').v2
 
 
 //GET
@@ -19,13 +19,19 @@ const getUser = async (req, res) => {
             });
         }
 
+        const pins = await Pin.find({ user: userDB._id }).populate('user', 'name -_id');
+        const favs = await Pin.find({ likes: userDB._id.toString() }).populate('user', 'name -_id');
+
+        favs.forEach(pin => pin.likes = pin.likes.length)
+        pins.forEach(pin => pin.likes = pin.likes.length)
+
         res.json({
             ok: true,
             user: {
                 name: userDB.name,
                 email: userDB.email,
-                lastname: userDB.lastname,
-                address: userDB.address
+                pins,
+                favs
             },
         });
 
@@ -41,7 +47,7 @@ const getUser = async (req, res) => {
 //CREATE
 const createUser = async (req, res) => {
     try {
-        const { name, email, password, image } = req.body
+        const { name, email, password } = req.body
         const existUser = await User.findOne({ email })
 
         //VERIFY EMAIL
@@ -57,17 +63,6 @@ const createUser = async (req, res) => {
         const salt = bcrypt.genSaltSync()
         user.password = bcrypt.hashSync(password, salt)
 
-        //MOVING IMAGE CLOUDINARY
-        if (image) {
-            const oldNameArray = image.split('/');
-            const oldnameId = oldNameArray[oldNameArray.length - 1];
-            const [public_id] = oldnameId.split('.');
-            const newPublic_id = `user/${public_id}`
-
-            const { secure_url } = await cloudinary.uploader.rename(public_id, newPublic_id)
-            user.image = secure_url
-        }
-
         //SAVE USER
         user.name = name.toLowerCase()
         await user.save()
@@ -77,7 +72,7 @@ const createUser = async (req, res) => {
         const token = await generatorJWT(user.id, expire);
         res.json({
             ok: true,
-            user: user.name,
+            user: { name: user.name, email: user.email },
             token
         });
 
@@ -102,36 +97,6 @@ const updateUser = async (req, res) => {
                 ok: false,
                 message: "User not found"
             });
-        }
-
-        //MOVING IMAGE CLOUDINARY
-        const oldNameArray = image[0].split('/');
-
-        //IF THE OLD PHOTO WAS ORGANIZED BEFORE
-        let finishedOldRoute
-        if (oldNameArray.length === 10) {
-            //GET THE OLD ROUTE ARRAY
-            const oldRouteArray = oldNameArray.slice(-3)
-            const wholeOldRoute = oldRouteArray.join('/')
-            const [oldRoute] = wholeOldRoute.split('.')
-            finishedOldRoute = oldRoute.replace(/%20/g, " ")
-        } else {
-            const wholeOldRoute = oldNameArray[oldNameArray.length - 1];
-            [finishedOldRoute] = wholeOldRoute.split('.')
-        }
-
-        //GETTING THE LAST PART OF PUBLIC ID
-        const oldnameId = oldNameArray[oldNameArray.length - 1]
-        const [public_id] = oldnameId.split('.');
-        const newPublic_id = `user/${public_id}`
-
-        //JUST IN CASE THE NEXT VALIDATION DOESNT PASS
-        let finalImage = images[0]
-
-        //MOVING FOLDER
-        if (finishedOldRoute !== newPublic_id) {
-            const resp = await cloudinary.uploader.rename(finishedOldRoute, newPublic_id)
-            finalImage = resp.secure_url
         }
 
         //UPDATE USER

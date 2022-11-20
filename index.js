@@ -27,10 +27,8 @@ dbConnection()
 //ROUTES
 app.use('/api/user', require('./routes/user'))
 app.use('/api/auth', require('./routes/auth'))
-app.use('/api/post', require('./routes/post'))
-app.use('/api/comment', require('./routes/comment'))
+app.use('/api/pin', require('./routes/pin'))
 app.use('/api/like', require('./routes/like'))
-app.use('/api/upload', require('./routes/upload'))
 
 //LISTEN
 app.listen(process.env.PORT, () => {

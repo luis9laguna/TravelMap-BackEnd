@@ -8,10 +8,6 @@ const UserSchema = Schema(
             type: String,
             required: true
         },
-        lastname: {
-            type: String,
-            required: true
-        },
         email: {
             type: String,
             required: true,
@@ -20,18 +16,6 @@ const UserSchema = Schema(
         password: {
             type: String,
             required: true
-        },
-        image: {
-            type: String,
-            default: 'https://res.cloudinary.com/bestecommerce/image/upload/v1646973658/default/default_vzrr7n.jpg'
-        },
-        saved: {
-            type: Array,
-            default: []
-        },
-        following: {
-            type: Array,
-            default: []
         },
         google: {
             type: Boolean,

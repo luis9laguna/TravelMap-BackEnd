@@ -6,20 +6,28 @@ const PostSchema = Schema(
     {
         user: {
             type: Schema.Types.ObjectId,
-            ref: 'User'
+            ref: 'User',
+            required: true
         },
-        images: {
-            type: Array,
-            default: []
+        lat: {
+            type: Number,
+            required: true
         },
-        text: {
+        long: {
+            type: Number,
+            required: true
+        },
+        title: {
             type: String,
             required: true
         },
-        type: {
+        description: {
             type: String,
-            required: true,
-            enum: ['text', 'image']
+            required: true
+        },
+        rating: {
+            type: Number,
+            required: true
         },
         likes: {
             type: Array,
@@ -29,4 +37,4 @@ const PostSchema = Schema(
     { timestamps: true }
 );
 
-module.exports = model('Post', PostSchema);
+module.exports = model('Pin', PostSchema);

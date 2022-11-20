@@ -5,9 +5,7 @@ const { check } = require('express-validator');
 //FUNCTIONS
 const { login,
     googleSignIn,
-    changePassword,
-    forgetEmail,
-    resetPassword } = require('../controllers/auth');
+    changePassword } = require('../controllers/auth');
 const { checkParams } = require('../middlewares/check-params');
 const { checkJWT } = require('../middlewares/check-jwt');
 
@@ -35,27 +33,11 @@ router.post('/google',
 //CHANGE PASSWORD WITH LOGIN
 router.put('/change-password',
     [checkJWT,
-        check('oldPassword', 'OldPassword is required').not().isEmpty().trim().escape(),
-        check('newPassword', 'NewPassword is required').not().isEmpty().trim().escape().isLength({ min: 6 }),
+        check('oldpassword', 'OldPassword is required').not().isEmpty().trim().escape(),
+        check('newpassword', 'NewPassword is required').not().isEmpty().trim().escape().isLength({ min: 6 }),
         checkParams
     ],
     changePassword);
 
-//PETITION RESET PASSWORD
-router.post('/password-reset',
-    [
-        check('email', 'Email is required').not().isEmpty().trim().escape(),
-        checkParams
-    ],
-    forgetEmail);
-
-
-//RESET PASSWORD
-router.put('/password-reset/:token',
-    [
-        check('password', 'Password is required').not().isEmpty().trim().escape().isLength({ min: 6 }),
-        checkParams
-    ],
-    resetPassword);
 
 module.exports = router;

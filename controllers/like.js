@@ -1,62 +1,38 @@
 //REQUIRED
-const Post = require('../models/post');
-const Comment = require('../models/comment');
+const Pin = require('../models/pin');
 
 //CODE
 
-//GIVE POST A LIKE OR DISLIKE
-const postLikeAndDislike = async (req, res) => {
+//GIVE PIN A LIKE OR DISLIKE
+const pinLikeAndDislike = async (req, res) => {
     try {
 
         //GET USER CODE
         const userId = req.id;
 
-        //GET POST
+        //GET PIN
         const id = req.params.id;
-        const post = await Post.findById(id);
+        const pin = await Pin.findById(id).populate('user', 'name -_id');
 
         //LOOKING FOR LIKE
-        const like = post.likes.includes(userId)
-        if (like) post.likes.remove(userId)
-        else post.likes.push(userId)
+        const like = pin.likes.includes(userId)
+        let added;
+        if (like) {
+            pin.likes.remove(userId)
+            added = false
+        } else {
+            added = true;
+            pin.likes.push(userId)
+        }
 
         //SAVE
-        post.save()
+        await pin.save()
+        pin.likes = pin.likes.length
 
         res.json({
             ok: true,
-            post
-        });
-    } catch (error) {
-        res.status(500).json({
-            ok: false,
-            message: 'Unexpected Error'
-        });
-    }
-}
-
-//GIVE COMMENT LIKE OR DISLIKE
-const commentLikeAndDislike = async (req, res) => {
-    try {
-
-        //GET USER CODE
-        const userId = req.id;
-
-        //GET POST
-        const id = req.params.id;
-        const comment = await Comment.findById(id);
-
-        //LOOKING FOR LIKE
-        const like = comment.likes.includes(userId)
-        if (like) comment.likes.remove(userId)
-        else comment.likes.push(userId)
-
-        //SAVE
-        comment.save()
-
-        res.json({
-            ok: true,
-            comment
+            pin,
+            added
         });
     } catch (error) {
         res.status(500).json({
@@ -69,6 +45,5 @@ const commentLikeAndDislike = async (req, res) => {
 
 
 module.exports = {
-    postLikeAndDislike,
-    commentLikeAndDislike
+    pinLikeAndDislike
 }
