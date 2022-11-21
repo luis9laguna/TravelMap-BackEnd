@@ -27,9 +27,8 @@ const login = async (req, res) => {
         const validPassword = bcrypt.compareSync(password, userDB.password);
         if (!validPassword) return errorMessage()
 
-        const expire = '12h'
         //GENERATE TOKEN
-        const token = await generatorJWT(userDB.id, expire);
+        const token = await generatorJWT(userDB.id, '12h');
 
         const pins = await Pin.find({ user: userDB._id }).populate('user', 'name -_id');
         const favs = await Pin.find({ likes: userDB._id.toString() }).populate('user', 'name -_id');
@@ -63,15 +62,13 @@ const googleSignIn = async (req, res) => {
     const tokenGoogle = req.body.token;
 
     try {
-        const { given_name, family_name, email, picture } = await googleVerify(tokenGoogle);
+        const { given_name, email } = await googleVerify(tokenGoogle);
         let user = await User.findOne({ email });
 
         if (!user) {
             // CREATE USER
             const data = {
                 name: given_name.toLowerCase(),
-                image: picture,
-                lastname: family_name.toLowerCase(),
                 email: email.toLowerCase(),
                 password: 'none',
                 google: true
@@ -81,15 +78,24 @@ const googleSignIn = async (req, res) => {
             await user.save();
         }
 
-        const expire = '12h'
-        // JWT
-        const token = await generatorJWT(user.id, expire);
+        const token = await generatorJWT(user.id, '12h');
+
+        const pins = await Pin.find({ user: user._id }).populate('user', 'name -_id');
+        const favs = await Pin.find({ likes: user._id.toString() }).populate('user', 'name -_id');
+
+        favs.forEach(pin => pin.likes = pin.likes.length)
+        pins.forEach(pin => pin.likes = pin.likes.length)
+
 
         res.json({
-            message: 'User logged',
+            ok: true,
             token,
-            user: { name: user.name, image: picture }
-
+            user: {
+                name: user.name,
+                email: user.email,
+                pins,
+                favs
+            },
         });
 
     } catch (error) {
